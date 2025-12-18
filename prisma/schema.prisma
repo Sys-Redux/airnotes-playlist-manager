@@ -1,0 +1,93 @@
+
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== Core Models ====================
+
+model User {
+  id          String     @id @default(cuid())
+  email       String     @unique
+  name        String?
+  preferences Json?      // Stores preferred genres, favorite artists, etc.
+  playlists   Playlist[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Playlist {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  songs       PlaylistSong[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // For binary tree hierarchy (self-referential)
+  parent      Playlist?      @relation("PlaylistHierarchy", fields: [parentId], references: [id])
+  parentId    String?
+  children    Playlist[]     @relation("PlaylistHierarchy")
+
+  @@index([userId])
+}
+
+model Song {
+  id          String         @id @default(cuid())
+  title       String
+  artist      String
+  album       String?
+  genre       String?
+  duration    Int            // Duration in seconds
+  releaseDate DateTime?
+  metadata    Json?          // Flexible field for additional data
+  playlists   PlaylistSong[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // For Dijkstra's algorithm - song connections
+  connectionsFrom SongConnection[] @relation("SourceSong")
+  connectionsTo   SongConnection[] @relation("TargetSong")
+
+  @@index([title])
+  @@index([artist])
+  @@index([genre])
+}
+
+// ==================== Junction Tables ====================
+
+// Many-to-many: Playlist <-> Song with ordering
+model PlaylistSong {
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  playlistId String
+  song       Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  songId     String
+  position   Int      // Order within playlist
+  addedAt    DateTime @default(now())
+
+  @@id([playlistId, songId])
+  @@index([playlistId])
+}
+
+// ==================== Algorithm Support Models ====================
+
+// For Dijkstra's algorithm - weighted graph edges between songs
+model SongConnection {
+  id           String @id @default(cuid())
+  sourceSong   Song   @relation("SourceSong", fields: [sourceSongId], references: [id], onDelete: Cascade)
+  sourceSongId String
+  targetSong   Song   @relation("TargetSong", fields: [targetSongId], references: [id], onDelete: Cascade)
+  targetSongId String
+  weight       Float  // Edge weight (e.g., based on genre similarity, tempo, etc.)
+
+  @@unique([sourceSongId, targetSongId])
+  @@index([sourceSongId])
+  @@index([targetSongId])
+}

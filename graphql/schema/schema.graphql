@@ -1,0 +1,11 @@
+"Base Query type - extended by prisma models"
+type Query {
+    "Health check"
+    _health: String!
+}
+
+"Base Mutation type"
+type Mutation {
+    "Health check"
+    _health: String!
+}
