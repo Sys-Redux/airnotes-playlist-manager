@@ -1,0 +1,70 @@
+"""
+Playlist represents a collection of songs created by a user.
+Supports hierarchical structure (parent/child) for binary tree operations.
+"""
+type Playlist {
+    id: ID!
+    name: String!
+    description: String
+    "User owns this Playlist"
+    user: User!
+    "Songs in this Playlist with their positions"
+    song: [PlaylistSong!]!
+    parent: Playlist
+    children: [Playlist!]!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+"Junction representing Song's membership in a Playlist with position"
+type PlaylistSong {
+    song: Song!
+    position: Int!
+    addedAt: DateTime!
+}
+
+input CreatePlaylistInput {
+    name: String!
+    description: String
+    userId: ID!
+}
+
+type CreatePlaylistResponse {
+    code: Int!
+    success: Boolean!
+    message: String!
+    playlist: Playlist
+}
+
+input UpdatePlaylistInput {
+    name: String
+    description: String
+}
+
+extend type Query {
+    "Get Playlist by ID"
+    playlist(id: ID!): Playlist
+
+    "Get all Playlists for a User"
+    playlists(userId: ID!): [Playlist!]!
+}
+
+extend type Mutation {
+    "Create a Playlist"
+    createPlaylist(input: CreatePlaylistInput!): CreatePlaylistResponse!
+
+    "Update a playlist's name or description"
+    updatePlaylist(id: ID!, input: UpdatePlaylistInput!): Playlist!
+
+    "Delete a Playlist by ID"
+    deletePlaylist(id: ID!): Boolean!
+
+    "Add a Song to the end of a playlist"
+    addSongToPlaylist(playlistId: ID!, songId: ID!): Playlist!
+
+    "Add a Song to a specific position in a playlist"
+    addSongToPlaylistAtPosition(playlistId: ID!, songId: ID!, position: Int!): Playlist!
+
+    "Remove a Song from a playlist"
+    removeSongFromPlaylist(playlistId: ID!, songId: ID!): Playlist!
+}

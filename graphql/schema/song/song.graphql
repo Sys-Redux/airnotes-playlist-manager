@@ -1,0 +1,58 @@
+"Song represents a musical track in airnotes"
+type Song {
+    id: ID!
+    title: String!
+    artist: String!
+    album: String
+    genre: String
+    "Duration in seconds"
+    duration: Int!
+    releaseDate: DateTime
+    "Flexible field for additional metadata"
+    metadata: JSON
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
+input SearchCriteriaInput {
+    title: String
+    artist: String
+    album: String
+    genre: String
+}
+
+input CreateSongInput {
+    title: String!
+    artist: String!
+    album: String
+    genre: String
+    duration: Int!
+    releaseDate: DateTime
+    metadata: JSON
+}
+
+type CreateSongResponse {
+    code: Int!
+    success: Boolean!
+    message: String!
+    song: Song
+}
+
+extend type Query {
+    "Get song by ID"
+    song(id: ID!): Song
+
+    "Get all songs with optional pagination"
+    songs(limit: Int, offset: Int): [Song!]!
+
+    "Search songs by query string & optional criteria"
+    searchSongs(query: String!, criteria: SearchCriteriaInput): [Song!]!
+}
+
+extend type Mutation {
+    "Create a song"
+    createSong(input: CreateSongInput!): CreateSongResponse!
+
+    "Delete a song by ID"
+    deleteSong(id: ID!): Boolean!
+}

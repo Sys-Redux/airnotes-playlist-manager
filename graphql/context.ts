@@ -1,4 +1,4 @@
-import { PrismaClient } from '@/lib/generated/prisma';
+import { PrismaClient } from '@/lib/generated/prisma/client';
 import prisma from '@/lib/prisma';
 
 // Context is available in all resolvers
