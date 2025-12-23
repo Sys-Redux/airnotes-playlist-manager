@@ -1,0 +1,92 @@
+"""
+Constraints for finding shortest path between songs.
+All constraints are optional.
+"""
+input PathConstraints {
+    "Maximum total weight (distance) allowed for the path"
+    maxWeight: Float
+    "Only traverse songs of these genres"
+    allowedGenres: [String!]
+    "Maximum number of songs in the path"
+    maxHops: Int
+}
+
+"""
+A single step in the path from one song to another.
+"""
+type PathStep {
+    "The song at this step"
+    song: Song!
+    "Cumulative weight from start to this song"
+    cumulativeWeight: Float!
+    "Position in the path (0-indexed)"
+    stepNumber: Int!
+}
+
+"""
+Result of finding the shortest path between two songs.
+"""
+type ShortestPathResult {
+    "Whether a valid path was found"
+    found: Boolean!
+    "Ordered list of songs from start to end"
+    path: [PathStep!]!
+    "Total weight (distance) of the path"
+    totalWeight: Float!
+    "Number of songs in the path (including start and end)"
+    pathLength: Int!
+    "The starting song"
+    startSong: Song
+    "The ending song"
+    endSong: Song
+}
+
+"""
+Represents a connection between two songs with a similarity weight.
+Lower weight = more similar songs.
+"""
+type SongConnection {
+    id: ID!
+    sourceSong: Song!
+    targetSong: Song!
+    weight: Float!
+}
+
+input CreateSongConnectionInput {
+    sourceSongId: ID!
+    targetSongId: ID!
+    weight: Float!
+}
+
+extend type Query {
+    """
+    Find the shortest path between two songs using Dijkstra's algorithm.
+    Returns the optimal sequence of songs to transition smoothly.
+    """
+    shortestPath(
+        startSongId: ID!
+        endSongId: ID!
+        constraints: PathConstraints
+    ): ShortestPathResult!
+
+    """
+    Get all connections for a specific song.
+    Useful for seeing what songs are similar.
+    """
+    songConnections(songId: ID!): [SongConnection!]!
+}
+
+extend type Mutation {
+    """
+    Create a connection between two similar songs.
+    This defines how 'similar' the songs are for pathfinding.
+    """
+    createSongConnection(
+        input: CreateSongConnectionInput!
+    ): SongConnection!
+
+    """
+    Remove a connection between two songs.
+    """
+    deleteSongConnection(sourceSongId: ID!, targetSongId: ID!): Boolean!
+}

@@ -35,6 +35,12 @@ export type CreatePlaylistResponse = {
   success: Scalars['Boolean']['output'];
 };
 
+export type CreateSongConnectionInput = {
+  sourceSongId: Scalars['ID']['input'];
+  targetSongId: Scalars['ID']['input'];
+  weight: Scalars['Float']['input'];
+};
+
 export type CreateSongInput = {
   album?: InputMaybe<Scalars['String']['input']>;
   artist: Scalars['String']['input'];
@@ -80,12 +86,19 @@ export type Mutation = {
   createPlaylist: CreatePlaylistResponse;
   /** Create a song */
   createSong: CreateSongResponse;
+  /**
+   * Create a connection between two similar songs.
+   * This defines how 'similar' the songs are for pathfinding.
+   */
+  createSongConnection: SongConnection;
   /** Create User */
   createUser: CreateUserResponse;
   /** Delete a Playlist by ID */
   deletePlaylist: Scalars['Boolean']['output'];
   /** Delete a song by ID */
   deleteSong: Scalars['Boolean']['output'];
+  /** Remove a connection between two songs. */
+  deleteSongConnection: Scalars['Boolean']['output'];
   /** Remove a Song from a playlist */
   removeSongFromPlaylist: Playlist;
   /** Update User Preferences */
@@ -123,6 +136,12 @@ export type MutationCreateSongArgs = {
 
 
 /** Base Mutation type */
+export type MutationCreateSongConnectionArgs = {
+  input: CreateSongConnectionInput;
+};
+
+
+/** Base Mutation type */
 export type MutationCreateUserArgs = {
   input: CreateUserInput;
 };
@@ -137,6 +156,13 @@ export type MutationDeletePlaylistArgs = {
 /** Base Mutation type */
 export type MutationDeleteSongArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationDeleteSongConnectionArgs = {
+  sourceSongId: Scalars['ID']['input'];
+  targetSongId: Scalars['ID']['input'];
 };
 
 
@@ -158,6 +184,30 @@ export type MutationSetUserPreferencesArgs = {
 export type MutationUpdatePlaylistArgs = {
   id: Scalars['ID']['input'];
   input: UpdatePlaylistInput;
+};
+
+/**
+ * Constraints for finding shortest path between songs.
+ * All constraints are optional.
+ */
+export type PathConstraints = {
+  /** Only traverse songs of these genres */
+  allowedGenres?: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Maximum number of songs in the path */
+  maxHops?: InputMaybe<Scalars['Int']['input']>;
+  /** Maximum total weight (distance) allowed for the path */
+  maxWeight?: InputMaybe<Scalars['Float']['input']>;
+};
+
+/** A single step in the path from one song to another. */
+export type PathStep = {
+  __typename?: 'PathStep';
+  /** Cumulative weight from start to this song */
+  cumulativeWeight: Scalars['Float']['output'];
+  /** The song at this step */
+  song: Song;
+  /** Position in the path (0-indexed) */
+  stepNumber: Scalars['Int']['output'];
 };
 
 /**
@@ -198,8 +248,18 @@ export type Query = {
   playlists: Array<Playlist>;
   /** Search songs by query string & optional criteria */
   searchSongs: Array<Song>;
+  /**
+   * Find the shortest path between two songs using Dijkstra's algorithm.
+   * Returns the optimal sequence of songs to transition smoothly.
+   */
+  shortestPath: ShortestPathResult;
   /** Get song by ID */
   song?: Maybe<Song>;
+  /**
+   * Get all connections for a specific song.
+   * Useful for seeing what songs are similar.
+   */
+  songConnections: Array<SongConnection>;
   /** Get all songs with optional pagination */
   songs: Array<Song>;
   /** Get User by ID */
@@ -229,8 +289,22 @@ export type QuerySearchSongsArgs = {
 
 
 /** Base Query type - extended by prisma models */
+export type QueryShortestPathArgs = {
+  constraints?: InputMaybe<PathConstraints>;
+  endSongId: Scalars['ID']['input'];
+  startSongId: Scalars['ID']['input'];
+};
+
+
+/** Base Query type - extended by prisma models */
 export type QuerySongArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+/** Base Query type - extended by prisma models */
+export type QuerySongConnectionsArgs = {
+  songId: Scalars['ID']['input'];
 };
 
 
@@ -259,6 +333,23 @@ export type SearchCriteriaInput = {
   title?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Result of finding the shortest path between two songs. */
+export type ShortestPathResult = {
+  __typename?: 'ShortestPathResult';
+  /** The ending song */
+  endSong?: Maybe<Song>;
+  /** Whether a valid path was found */
+  found: Scalars['Boolean']['output'];
+  /** Ordered list of songs from start to end */
+  path: Array<PathStep>;
+  /** Number of songs in the path (including start and end) */
+  pathLength: Scalars['Int']['output'];
+  /** The starting song */
+  startSong?: Maybe<Song>;
+  /** Total weight (distance) of the path */
+  totalWeight: Scalars['Float']['output'];
+};
+
 /** Song represents a musical track in airnotes */
 export type Song = {
   __typename?: 'Song';
@@ -274,6 +365,18 @@ export type Song = {
   releaseDate?: Maybe<Scalars['DateTime']['output']>;
   title: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
+};
+
+/**
+ * Represents a connection between two songs with a similarity weight.
+ * Lower weight = more similar songs.
+ */
+export type SongConnection = {
+  __typename?: 'SongConnection';
+  id: Scalars['ID']['output'];
+  sourceSong: Song;
+  targetSong: Song;
+  weight: Scalars['Float']['output'];
 };
 
 export type UpdatePlaylistInput = {
@@ -375,20 +478,26 @@ export type ResolversTypes = {
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
   CreatePlaylistInput: CreatePlaylistInput;
   CreatePlaylistResponse: ResolverTypeWrapper<Omit<CreatePlaylistResponse, 'playlist'> & { playlist?: Maybe<ResolversTypes['Playlist']> }>;
+  CreateSongConnectionInput: CreateSongConnectionInput;
   CreateSongInput: CreateSongInput;
   CreateSongResponse: ResolverTypeWrapper<Omit<CreateSongResponse, 'song'> & { song?: Maybe<ResolversTypes['Song']> }>;
   CreateUserInput: CreateUserInput;
   CreateUserResponse: ResolverTypeWrapper<Omit<CreateUserResponse, 'user'> & { user?: Maybe<ResolversTypes['User']> }>;
   DateTime: ResolverTypeWrapper<Scalars['DateTime']['output']>;
+  Float: ResolverTypeWrapper<Scalars['Float']['output']>;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
   Int: ResolverTypeWrapper<Scalars['Int']['output']>;
   JSON: ResolverTypeWrapper<Scalars['JSON']['output']>;
   Mutation: ResolverTypeWrapper<Record<PropertyKey, never>>;
+  PathConstraints: PathConstraints;
+  PathStep: ResolverTypeWrapper<Omit<PathStep, 'song'> & { song: ResolversTypes['Song'] }>;
   Playlist: ResolverTypeWrapper<PlaylistModel>;
   PlaylistSong: ResolverTypeWrapper<PlaylistSongModel>;
   Query: ResolverTypeWrapper<Record<PropertyKey, never>>;
   SearchCriteriaInput: SearchCriteriaInput;
+  ShortestPathResult: ResolverTypeWrapper<Omit<ShortestPathResult, 'endSong' | 'path' | 'startSong'> & { endSong?: Maybe<ResolversTypes['Song']>, path: Array<ResolversTypes['PathStep']>, startSong?: Maybe<ResolversTypes['Song']> }>;
   Song: ResolverTypeWrapper<SongModel>;
+  SongConnection: ResolverTypeWrapper<Omit<SongConnection, 'sourceSong' | 'targetSong'> & { sourceSong: ResolversTypes['Song'], targetSong: ResolversTypes['Song'] }>;
   String: ResolverTypeWrapper<Scalars['String']['output']>;
   UpdatePlaylistInput: UpdatePlaylistInput;
   UpdateUserPreferencesInput: UpdateUserPreferencesInput;
@@ -400,20 +509,26 @@ export type ResolversParentTypes = {
   Boolean: Scalars['Boolean']['output'];
   CreatePlaylistInput: CreatePlaylistInput;
   CreatePlaylistResponse: Omit<CreatePlaylistResponse, 'playlist'> & { playlist?: Maybe<ResolversParentTypes['Playlist']> };
+  CreateSongConnectionInput: CreateSongConnectionInput;
   CreateSongInput: CreateSongInput;
   CreateSongResponse: Omit<CreateSongResponse, 'song'> & { song?: Maybe<ResolversParentTypes['Song']> };
   CreateUserInput: CreateUserInput;
   CreateUserResponse: Omit<CreateUserResponse, 'user'> & { user?: Maybe<ResolversParentTypes['User']> };
   DateTime: Scalars['DateTime']['output'];
+  Float: Scalars['Float']['output'];
   ID: Scalars['ID']['output'];
   Int: Scalars['Int']['output'];
   JSON: Scalars['JSON']['output'];
   Mutation: Record<PropertyKey, never>;
+  PathConstraints: PathConstraints;
+  PathStep: Omit<PathStep, 'song'> & { song: ResolversParentTypes['Song'] };
   Playlist: PlaylistModel;
   PlaylistSong: PlaylistSongModel;
   Query: Record<PropertyKey, never>;
   SearchCriteriaInput: SearchCriteriaInput;
+  ShortestPathResult: Omit<ShortestPathResult, 'endSong' | 'path' | 'startSong'> & { endSong?: Maybe<ResolversParentTypes['Song']>, path: Array<ResolversParentTypes['PathStep']>, startSong?: Maybe<ResolversParentTypes['Song']> };
   Song: SongModel;
+  SongConnection: Omit<SongConnection, 'sourceSong' | 'targetSong'> & { sourceSong: ResolversParentTypes['Song'], targetSong: ResolversParentTypes['Song'] };
   String: Scalars['String']['output'];
   UpdatePlaylistInput: UpdatePlaylistInput;
   UpdateUserPreferencesInput: UpdateUserPreferencesInput;
@@ -455,12 +570,20 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   addSongToPlaylistAtPosition?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationAddSongToPlaylistAtPositionArgs, 'playlistId' | 'position' | 'songId'>>;
   createPlaylist?: Resolver<ResolversTypes['CreatePlaylistResponse'], ParentType, ContextType, RequireFields<MutationCreatePlaylistArgs, 'input'>>;
   createSong?: Resolver<ResolversTypes['CreateSongResponse'], ParentType, ContextType, RequireFields<MutationCreateSongArgs, 'input'>>;
+  createSongConnection?: Resolver<ResolversTypes['SongConnection'], ParentType, ContextType, RequireFields<MutationCreateSongConnectionArgs, 'input'>>;
   createUser?: Resolver<ResolversTypes['CreateUserResponse'], ParentType, ContextType, RequireFields<MutationCreateUserArgs, 'input'>>;
   deletePlaylist?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeletePlaylistArgs, 'id'>>;
   deleteSong?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteSongArgs, 'id'>>;
+  deleteSongConnection?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteSongConnectionArgs, 'sourceSongId' | 'targetSongId'>>;
   removeSongFromPlaylist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationRemoveSongFromPlaylistArgs, 'playlistId' | 'songId'>>;
   setUserPreferences?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationSetUserPreferencesArgs, 'preferences' | 'userId'>>;
   updatePlaylist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationUpdatePlaylistArgs, 'id' | 'input'>>;
+};
+
+export type PathStepResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PathStep'] = ResolversParentTypes['PathStep']> = {
+  cumulativeWeight?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  song?: Resolver<ResolversTypes['Song'], ParentType, ContextType>;
+  stepNumber?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
 };
 
 export type PlaylistResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Playlist'] = ResolversParentTypes['Playlist']> = {
@@ -486,10 +609,21 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   playlist?: Resolver<Maybe<ResolversTypes['Playlist']>, ParentType, ContextType, RequireFields<QueryPlaylistArgs, 'id'>>;
   playlists?: Resolver<Array<ResolversTypes['Playlist']>, ParentType, ContextType, RequireFields<QueryPlaylistsArgs, 'userId'>>;
   searchSongs?: Resolver<Array<ResolversTypes['Song']>, ParentType, ContextType, RequireFields<QuerySearchSongsArgs, 'query'>>;
+  shortestPath?: Resolver<ResolversTypes['ShortestPathResult'], ParentType, ContextType, RequireFields<QueryShortestPathArgs, 'endSongId' | 'startSongId'>>;
   song?: Resolver<Maybe<ResolversTypes['Song']>, ParentType, ContextType, RequireFields<QuerySongArgs, 'id'>>;
+  songConnections?: Resolver<Array<ResolversTypes['SongConnection']>, ParentType, ContextType, RequireFields<QuerySongConnectionsArgs, 'songId'>>;
   songs?: Resolver<Array<ResolversTypes['Song']>, ParentType, ContextType, Partial<QuerySongsArgs>>;
   user?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType, RequireFields<QueryUserArgs, 'id'>>;
   userPreferences?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType, RequireFields<QueryUserPreferencesArgs, 'userId'>>;
+};
+
+export type ShortestPathResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ShortestPathResult'] = ResolversParentTypes['ShortestPathResult']> = {
+  endSong?: Resolver<Maybe<ResolversTypes['Song']>, ParentType, ContextType>;
+  found?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  path?: Resolver<Array<ResolversTypes['PathStep']>, ParentType, ContextType>;
+  pathLength?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  startSong?: Resolver<Maybe<ResolversTypes['Song']>, ParentType, ContextType>;
+  totalWeight?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
 };
 
 export type SongResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Song'] = ResolversParentTypes['Song']> = {
@@ -503,6 +637,13 @@ export type SongResolvers<ContextType = GraphQLContext, ParentType extends Resol
   releaseDate?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
   title?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+};
+
+export type SongConnectionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SongConnection'] = ResolversParentTypes['SongConnection']> = {
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  sourceSong?: Resolver<ResolversTypes['Song'], ParentType, ContextType>;
+  targetSong?: Resolver<ResolversTypes['Song'], ParentType, ContextType>;
+  weight?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
 };
 
 export type UserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = {
@@ -522,10 +663,13 @@ export type Resolvers<ContextType = GraphQLContext> = {
   DateTime?: GraphQLScalarType;
   JSON?: GraphQLScalarType;
   Mutation?: MutationResolvers<ContextType>;
+  PathStep?: PathStepResolvers<ContextType>;
   Playlist?: PlaylistResolvers<ContextType>;
   PlaylistSong?: PlaylistSongResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
+  ShortestPathResult?: ShortestPathResultResolvers<ContextType>;
   Song?: SongResolvers<ContextType>;
+  SongConnection?: SongConnectionResolvers<ContextType>;
   User?: UserResolvers<ContextType>;
 };
 
