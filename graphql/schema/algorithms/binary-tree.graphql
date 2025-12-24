@@ -1,0 +1,98 @@
+"""
+Traversal order for navigating the playlist hierarchy.
+"""
+enum TraversalOrder {
+    "Root -> Children -> Siblings (top-down)"
+    PRE_ORDER
+    "Children -> Root -> Siblings"
+    IN_ORDER
+    "Children -> Siblings -> Root (bottom-up)"
+    POST_ORDER
+    "Level by Level (breadth-first)"
+    LEVEL_ORDER
+}
+
+"""
+A node in the playlist hierarchy tree.
+"""
+type PlaylistHierarchyNode {
+    "The playlist at this node"
+    playlist: Playlist!
+    "Depth level in the tree (0=root)"
+    depth: Int!
+    "Number of child playlists"
+    childCount: Int!
+    "Total songs in this playlist & all descendants"
+    totalSongs: Int!
+}
+
+"""
+Result of traversing a playlist hierarchy.
+"""
+type PlaylistHierarchyResult {
+    "The root playlist of the hierarchy"
+    root: Playlist!
+    "All playlists in traversal order"
+    nodes: [PlaylistHierarchyNode!]!
+    "Maximum depth of tree"
+    maxDepth: Int!
+    "Total number of playlists in the hierarchy"
+    totalPlaylists: Int!
+    "Total songs across all playlists"
+    totalSongs: Int!
+    "The traversal order used"
+    traversalOrder: TraversalOrder!
+}
+
+"""
+Input for creating a playlist hierarchy relationship.
+"""
+input SetPlaylistParentInput {
+    "The playlist to set as a child"
+    playlistId: ID!
+    "The parent playlist ID (null to make it root)"
+    parentId: ID
+}
+
+extend type Query {
+    """
+    Traverse a playlist hierarchy starting from the given root playlist ID.
+    Returns all playlists in the hierarchy in the specified traversal order.
+    """
+    playlistHierarchy(
+        rootPlaylistId: ID!
+        order: TraversalOrder = PRE_ORDER
+    ): PlaylistHierarchyResult!
+
+    """
+    Get all root playlists (playlists with no parent) for a user.
+    """
+    rootPlaylists(userId: ID!): [Playlist!]!
+
+    """
+    Get the full path from a playlist to its root ancestor.
+    """
+    playlistAncestors(playlistId: ID!): [Playlist!]!
+}
+
+extend type Mutation {
+    """
+    Set/update a playlist's parent, creating a hierarchy relationship.
+    """
+    setPlaylistParent(input: SetPlaylistParentInput!): Playlist!
+
+    """
+    Remove a playlist from the hierarchy (sets parentId to null).
+    Children will be re-parented to the removed playlist's parent.
+    """
+    removeFromHierarchy(playlistId: ID!): Playlist!
+
+    """
+    Create a new playlist as a child of an existing playlist.
+    """
+    createChildPlaylist(
+        parentId: ID!
+        name: String!
+        description: String
+    ): Playlist!
+}

@@ -82,6 +82,8 @@ export type Mutation = {
   addSongToPlaylist: Playlist;
   /** Add a Song to a specific position in a playlist */
   addSongToPlaylistAtPosition: Playlist;
+  /** Create a new playlist as a child of an existing playlist. */
+  createChildPlaylist: Playlist;
   /** Create a Playlist */
   createPlaylist: CreatePlaylistResponse;
   /** Create a song */
@@ -99,8 +101,15 @@ export type Mutation = {
   deleteSong: Scalars['Boolean']['output'];
   /** Remove a connection between two songs. */
   deleteSongConnection: Scalars['Boolean']['output'];
+  /**
+   * Remove a playlist from the hierarchy (sets parentId to null).
+   * Children will be re-parented to the removed playlist's parent.
+   */
+  removeFromHierarchy: Playlist;
   /** Remove a Song from a playlist */
   removeSongFromPlaylist: Playlist;
+  /** Set/update a playlist's parent, creating a hierarchy relationship. */
+  setPlaylistParent: Playlist;
   /** Update User Preferences */
   setUserPreferences: User;
   /** Update a playlist's name or description */
@@ -120,6 +129,14 @@ export type MutationAddSongToPlaylistAtPositionArgs = {
   playlistId: Scalars['ID']['input'];
   position: Scalars['Int']['input'];
   songId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationCreateChildPlaylistArgs = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
+  parentId: Scalars['ID']['input'];
 };
 
 
@@ -167,9 +184,21 @@ export type MutationDeleteSongConnectionArgs = {
 
 
 /** Base Mutation type */
+export type MutationRemoveFromHierarchyArgs = {
+  playlistId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
 export type MutationRemoveSongFromPlaylistArgs = {
   playlistId: Scalars['ID']['input'];
   songId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationSetPlaylistParentArgs = {
+  input: SetPlaylistParentInput;
 };
 
 
@@ -229,6 +258,36 @@ export type Playlist = {
   user: User;
 };
 
+/** A node in the playlist hierarchy tree. */
+export type PlaylistHierarchyNode = {
+  __typename?: 'PlaylistHierarchyNode';
+  /** Number of child playlists */
+  childCount: Scalars['Int']['output'];
+  /** Depth level in the tree (0=root) */
+  depth: Scalars['Int']['output'];
+  /** The playlist at this node */
+  playlist: Playlist;
+  /** Total songs in this playlist & all descendants */
+  totalSongs: Scalars['Int']['output'];
+};
+
+/** Result of traversing a playlist hierarchy. */
+export type PlaylistHierarchyResult = {
+  __typename?: 'PlaylistHierarchyResult';
+  /** Maximum depth of tree */
+  maxDepth: Scalars['Int']['output'];
+  /** All playlists in traversal order */
+  nodes: Array<PlaylistHierarchyNode>;
+  /** The root playlist of the hierarchy */
+  root: Playlist;
+  /** Total number of playlists in the hierarchy */
+  totalPlaylists: Scalars['Int']['output'];
+  /** Total songs across all playlists */
+  totalSongs: Scalars['Int']['output'];
+  /** The traversal order used */
+  traversalOrder: TraversalOrder;
+};
+
 /** Junction representing Song's membership in a Playlist with position */
 export type PlaylistSong = {
   __typename?: 'PlaylistSong';
@@ -244,8 +303,17 @@ export type Query = {
   _health: Scalars['String']['output'];
   /** Get Playlist by ID */
   playlist?: Maybe<Playlist>;
+  /** Get the full path from a playlist to its root ancestor. */
+  playlistAncestors: Array<Playlist>;
+  /**
+   * Traverse a playlist hierarchy starting from the given root playlist ID.
+   * Returns all playlists in the hierarchy in the specified traversal order.
+   */
+  playlistHierarchy: PlaylistHierarchyResult;
   /** Get all Playlists for a User */
   playlists: Array<Playlist>;
+  /** Get all root playlists (playlists with no parent) for a user. */
+  rootPlaylists: Array<Playlist>;
   /** Search songs by query string & optional criteria */
   searchSongs: Array<Song>;
   /**
@@ -276,7 +344,26 @@ export type QueryPlaylistArgs = {
 
 
 /** Base Query type - extended by prisma models */
+export type QueryPlaylistAncestorsArgs = {
+  playlistId: Scalars['ID']['input'];
+};
+
+
+/** Base Query type - extended by prisma models */
+export type QueryPlaylistHierarchyArgs = {
+  order?: InputMaybe<TraversalOrder>;
+  rootPlaylistId: Scalars['ID']['input'];
+};
+
+
+/** Base Query type - extended by prisma models */
 export type QueryPlaylistsArgs = {
+  userId: Scalars['ID']['input'];
+};
+
+
+/** Base Query type - extended by prisma models */
+export type QueryRootPlaylistsArgs = {
   userId: Scalars['ID']['input'];
 };
 
@@ -333,6 +420,14 @@ export type SearchCriteriaInput = {
   title?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Input for creating a playlist hierarchy relationship. */
+export type SetPlaylistParentInput = {
+  /** The parent playlist ID (null to make it root) */
+  parentId?: InputMaybe<Scalars['ID']['input']>;
+  /** The playlist to set as a child */
+  playlistId: Scalars['ID']['input'];
+};
+
 /** Result of finding the shortest path between two songs. */
 export type ShortestPathResult = {
   __typename?: 'ShortestPathResult';
@@ -378,6 +473,18 @@ export type SongConnection = {
   targetSong: Song;
   weight: Scalars['Float']['output'];
 };
+
+/** Traversal order for navigating the playlist hierarchy. */
+export enum TraversalOrder {
+  /** Children -> Root -> Siblings */
+  InOrder = 'IN_ORDER',
+  /** Level by Level (breadth-first) */
+  LevelOrder = 'LEVEL_ORDER',
+  /** Children -> Siblings -> Root (bottom-up) */
+  PostOrder = 'POST_ORDER',
+  /** Root -> Children -> Siblings (top-down) */
+  PreOrder = 'PRE_ORDER'
+}
 
 export type UpdatePlaylistInput = {
   description?: InputMaybe<Scalars['String']['input']>;
@@ -492,13 +599,17 @@ export type ResolversTypes = {
   PathConstraints: PathConstraints;
   PathStep: ResolverTypeWrapper<Omit<PathStep, 'song'> & { song: ResolversTypes['Song'] }>;
   Playlist: ResolverTypeWrapper<PlaylistModel>;
+  PlaylistHierarchyNode: ResolverTypeWrapper<Omit<PlaylistHierarchyNode, 'playlist'> & { playlist: ResolversTypes['Playlist'] }>;
+  PlaylistHierarchyResult: ResolverTypeWrapper<Omit<PlaylistHierarchyResult, 'nodes' | 'root'> & { nodes: Array<ResolversTypes['PlaylistHierarchyNode']>, root: ResolversTypes['Playlist'] }>;
   PlaylistSong: ResolverTypeWrapper<PlaylistSongModel>;
   Query: ResolverTypeWrapper<Record<PropertyKey, never>>;
   SearchCriteriaInput: SearchCriteriaInput;
+  SetPlaylistParentInput: SetPlaylistParentInput;
   ShortestPathResult: ResolverTypeWrapper<Omit<ShortestPathResult, 'endSong' | 'path' | 'startSong'> & { endSong?: Maybe<ResolversTypes['Song']>, path: Array<ResolversTypes['PathStep']>, startSong?: Maybe<ResolversTypes['Song']> }>;
   Song: ResolverTypeWrapper<SongModel>;
   SongConnection: ResolverTypeWrapper<Omit<SongConnection, 'sourceSong' | 'targetSong'> & { sourceSong: ResolversTypes['Song'], targetSong: ResolversTypes['Song'] }>;
   String: ResolverTypeWrapper<Scalars['String']['output']>;
+  TraversalOrder: TraversalOrder;
   UpdatePlaylistInput: UpdatePlaylistInput;
   UpdateUserPreferencesInput: UpdateUserPreferencesInput;
   User: ResolverTypeWrapper<UserModel>;
@@ -523,9 +634,12 @@ export type ResolversParentTypes = {
   PathConstraints: PathConstraints;
   PathStep: Omit<PathStep, 'song'> & { song: ResolversParentTypes['Song'] };
   Playlist: PlaylistModel;
+  PlaylistHierarchyNode: Omit<PlaylistHierarchyNode, 'playlist'> & { playlist: ResolversParentTypes['Playlist'] };
+  PlaylistHierarchyResult: Omit<PlaylistHierarchyResult, 'nodes' | 'root'> & { nodes: Array<ResolversParentTypes['PlaylistHierarchyNode']>, root: ResolversParentTypes['Playlist'] };
   PlaylistSong: PlaylistSongModel;
   Query: Record<PropertyKey, never>;
   SearchCriteriaInput: SearchCriteriaInput;
+  SetPlaylistParentInput: SetPlaylistParentInput;
   ShortestPathResult: Omit<ShortestPathResult, 'endSong' | 'path' | 'startSong'> & { endSong?: Maybe<ResolversParentTypes['Song']>, path: Array<ResolversParentTypes['PathStep']>, startSong?: Maybe<ResolversParentTypes['Song']> };
   Song: SongModel;
   SongConnection: Omit<SongConnection, 'sourceSong' | 'targetSong'> & { sourceSong: ResolversParentTypes['Song'], targetSong: ResolversParentTypes['Song'] };
@@ -568,6 +682,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   _health?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   addSongToPlaylist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationAddSongToPlaylistArgs, 'playlistId' | 'songId'>>;
   addSongToPlaylistAtPosition?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationAddSongToPlaylistAtPositionArgs, 'playlistId' | 'position' | 'songId'>>;
+  createChildPlaylist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationCreateChildPlaylistArgs, 'name' | 'parentId'>>;
   createPlaylist?: Resolver<ResolversTypes['CreatePlaylistResponse'], ParentType, ContextType, RequireFields<MutationCreatePlaylistArgs, 'input'>>;
   createSong?: Resolver<ResolversTypes['CreateSongResponse'], ParentType, ContextType, RequireFields<MutationCreateSongArgs, 'input'>>;
   createSongConnection?: Resolver<ResolversTypes['SongConnection'], ParentType, ContextType, RequireFields<MutationCreateSongConnectionArgs, 'input'>>;
@@ -575,7 +690,9 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deletePlaylist?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeletePlaylistArgs, 'id'>>;
   deleteSong?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteSongArgs, 'id'>>;
   deleteSongConnection?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteSongConnectionArgs, 'sourceSongId' | 'targetSongId'>>;
+  removeFromHierarchy?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationRemoveFromHierarchyArgs, 'playlistId'>>;
   removeSongFromPlaylist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationRemoveSongFromPlaylistArgs, 'playlistId' | 'songId'>>;
+  setPlaylistParent?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationSetPlaylistParentArgs, 'input'>>;
   setUserPreferences?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationSetUserPreferencesArgs, 'preferences' | 'userId'>>;
   updatePlaylist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationUpdatePlaylistArgs, 'id' | 'input'>>;
 };
@@ -598,6 +715,22 @@ export type PlaylistResolvers<ContextType = GraphQLContext, ParentType extends R
   user?: Resolver<ResolversTypes['User'], ParentType, ContextType>;
 };
 
+export type PlaylistHierarchyNodeResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PlaylistHierarchyNode'] = ResolversParentTypes['PlaylistHierarchyNode']> = {
+  childCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  depth?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  playlist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType>;
+  totalSongs?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+};
+
+export type PlaylistHierarchyResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PlaylistHierarchyResult'] = ResolversParentTypes['PlaylistHierarchyResult']> = {
+  maxDepth?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  nodes?: Resolver<Array<ResolversTypes['PlaylistHierarchyNode']>, ParentType, ContextType>;
+  root?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType>;
+  totalPlaylists?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  totalSongs?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  traversalOrder?: Resolver<ResolversTypes['TraversalOrder'], ParentType, ContextType>;
+};
+
 export type PlaylistSongResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PlaylistSong'] = ResolversParentTypes['PlaylistSong']> = {
   addedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   position?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -607,7 +740,10 @@ export type PlaylistSongResolvers<ContextType = GraphQLContext, ParentType exten
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
   _health?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   playlist?: Resolver<Maybe<ResolversTypes['Playlist']>, ParentType, ContextType, RequireFields<QueryPlaylistArgs, 'id'>>;
+  playlistAncestors?: Resolver<Array<ResolversTypes['Playlist']>, ParentType, ContextType, RequireFields<QueryPlaylistAncestorsArgs, 'playlistId'>>;
+  playlistHierarchy?: Resolver<ResolversTypes['PlaylistHierarchyResult'], ParentType, ContextType, RequireFields<QueryPlaylistHierarchyArgs, 'order' | 'rootPlaylistId'>>;
   playlists?: Resolver<Array<ResolversTypes['Playlist']>, ParentType, ContextType, RequireFields<QueryPlaylistsArgs, 'userId'>>;
+  rootPlaylists?: Resolver<Array<ResolversTypes['Playlist']>, ParentType, ContextType, RequireFields<QueryRootPlaylistsArgs, 'userId'>>;
   searchSongs?: Resolver<Array<ResolversTypes['Song']>, ParentType, ContextType, RequireFields<QuerySearchSongsArgs, 'query'>>;
   shortestPath?: Resolver<ResolversTypes['ShortestPathResult'], ParentType, ContextType, RequireFields<QueryShortestPathArgs, 'endSongId' | 'startSongId'>>;
   song?: Resolver<Maybe<ResolversTypes['Song']>, ParentType, ContextType, RequireFields<QuerySongArgs, 'id'>>;
@@ -665,6 +801,8 @@ export type Resolvers<ContextType = GraphQLContext> = {
   Mutation?: MutationResolvers<ContextType>;
   PathStep?: PathStepResolvers<ContextType>;
   Playlist?: PlaylistResolvers<ContextType>;
+  PlaylistHierarchyNode?: PlaylistHierarchyNodeResolvers<ContextType>;
+  PlaylistHierarchyResult?: PlaylistHierarchyResultResolvers<ContextType>;
   PlaylistSong?: PlaylistSongResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
   ShortestPathResult?: ShortestPathResultResolvers<ContextType>;
