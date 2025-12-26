@@ -19,6 +19,12 @@ model User {
   playlists   Playlist[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  // Queue relations
+  queueSongs       UserQueueSong[]
+  queueAddedSongs  UserQueueSong[] @relation("QueueAddedBy")
+  queueState       UserQueueState?
+  queueHistory     UserQueueHistory[]
 }
 
 model Playlist {
@@ -51,6 +57,11 @@ model Song {
   playlists   PlaylistSong[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+
+  // Queue relations
+  queueEntries     UserQueueSong[]
+  currentInQueues  UserQueueState[]
+  historyEntries   UserQueueHistory[]
 
   // For Dijkstra's algorithm - song connections
   connectionsFrom SongConnection[] @relation("SourceSong")
@@ -90,4 +101,71 @@ model SongConnection {
   @@unique([sourceSongId, targetSongId])
   @@index([sourceSongId])
   @@index([targetSongId])
+}
+
+// ==================== State Management Models ====================
+model PlaylistActionHistory {
+  id             String     @id @default(cuid())
+  playlistId     String
+  actionType     String     // e.g., "ADD_SONG", "REMOVE_SONG", "MOVE_SONG"
+  timeStamp      DateTime   @default(now())
+
+  // Action Payload
+  songId         String?
+  fromPosition   Int?
+  toPosition     Int?
+  previousValue  String?
+  newValue       String?
+
+  // Stack state: whether this is on the undo or redo stack
+  isUndone       Boolean   @default(false) // false = undo stack, true = redo stack
+
+  // Ordering for the stack (higher = more recent)
+  stackOrder     Int       @default(autoincrement())
+
+  @@index([playlistId, isUndone])
+  @@index([playlistId, stackOrder])
+}
+
+// Stores songs in a user's playback queue
+model UserQueueSong {
+  id        String   @id @default(cuid())
+  userId    String
+  songId    String
+  position  Int      // Position in the queue
+  addedAt   DateTime @default(now())
+  addedById String?   // Who added it (for collab queues)
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  addedBy   User?    @relation("QueueAddedBy", fields: [addedById], references: [id])
+
+  @@index([userId, position])
+  @@unique([userId, songId, position]) // Prevent duplicate songs at the same position
+}
+
+// Stores user's queue state (e.g., current position, shuffle, repeat)
+model UserQueueState {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  currentSongId String?
+  repeatMode    String   @default("NONE") // NONE, ONE, ALL
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentSong   Song?    @relation(fields: [currentSongId], references: [id])
+}
+
+// Stores recently played songs (history)
+model UserQueueHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  songId    String
+  playedAt  DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@index([userId, playedAt])
 }

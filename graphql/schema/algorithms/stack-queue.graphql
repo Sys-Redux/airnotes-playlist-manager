@@ -15,7 +15,7 @@ Represents a playlist action in the undo/redo history.
 type PlaylistAction {
     actionType: PlaylistActionType!
     playlistId: ID!
-    timestamp: DateTime!
+    timeStamp: DateTime!
     "Song ID involved in action"
     songId: ID
     "Original position (for move/remove)"
