@@ -137,12 +137,6 @@ export class BinaryTree<T> {
     }
 }
 
-// =========================================================================
-// TRAVERSAL ORDER OPTIONS
-// =========================================================================
-
-export type TraversalOrder = 'preOrder' | 'inOrder' | 'postOrder' | 'levelOrder';
-
 export function buildPlaylistTree<T extends { id: string; parentId: string | null }>(
     playlists: T[],
     rootId: string

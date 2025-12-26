@@ -1,0 +1,167 @@
+"""
+Types of playlist actions that can be undone/redone.
+"""
+enum PlaylistActionType {
+    ADD_SONG
+    REMOVE_SONG
+    MOVE_SONG
+    RENAME_PLAYLIST
+    UPDATE_DESCRIPTION
+}
+
+"""
+Represents a playlist action in the undo/redo history.
+"""
+type PlaylistAction {
+    actionType: PlaylistActionType!
+    playlistId: ID!
+    timestamp: DateTime!
+    "Song ID involved in action"
+    songId: ID
+    "Original position (for move/remove)"
+    fromPosition: Int
+    "New position (for move/add)"
+    toPosition: Int
+    "Previous value (for rename/update)"
+    previousValue: String
+    "New value (for rename/update)"
+    newValue: String
+}
+
+"""
+Undo/redo status for a playlist.
+"""
+type UndoRedoStatus {
+    canUndo: Boolean!
+    canRedo: Boolean!
+    undoHistoryCount: Int!
+    redoHistoryCount: Int!
+    lastAction: PlaylistAction
+}
+
+# ================ PLAYBACK QUEUE ===============
+
+"""
+Repeat mode for playback.
+"""
+enum RepeatMode {
+    NONE
+    ONE
+    ALL
+}
+
+"""
+A song in the playback queue.
+"""
+type QueuedSong {
+    song: Song!
+    position: Int!
+    addedAt: DateTime!
+    addedBy: User
+}
+
+"""
+Current playback queue state.
+"""
+type PlaybackQueueState {
+    "Currently playing song"
+    currentSong: QueuedSong
+    "Upcoming songs in order"
+    upcoming: [QueuedSong!]!
+    "Recently played songs (most recent first)"
+    history: [QueuedSong!]!
+    "Total songs in queue"
+    queueSize: Int!
+    "Current repeat mode"
+    repeatMode: RepeatMode!
+}
+
+"""
+Result of queue operation.
+"""
+type QueueOperationResult {
+    success: Boolean!
+    message: String!
+    queue: PlaybackQueueState!
+}
+
+extend type Query {
+    """
+    Get undo/redo status for a playlist.
+    """
+    playlistUndoStatus(playlistId: ID!): UndoRedoStatus!
+
+    """
+    Get undo history for a playlist.
+    """
+    playlistUndoHistory(playlistId: ID!, limit: Int = 10): [PlaylistAction!]!
+
+    """
+    Get the current playback queue for a user.
+    """
+    playbackQueue(userId: ID!): PlaybackQueueState!
+}
+
+extend type Mutation {
+    """
+    Undo last action on playlist. Returns the action that was undone.
+    """
+    undoPlaylistAction(playlistId: ID!): PlaylistAction
+
+    """
+    Redo last undone action on playlist. Returns the action that was redone.
+    """
+    redoPlaylistAction(playlistId: ID!): PlaylistAction
+
+    """
+    Clear all undo/redo history for a playlist.
+    """
+    clearPlaylistHistory(playlistId: ID!): Boolean!
+
+    # ================ PLAYBACK QUEUE MUTATIONS ===============
+
+    """
+    Add a song to user's playback queue.
+    """
+    addToQueue(userId: ID!, songId: ID!): QueueOperationResult!
+
+    """
+    Add multiple songs to the queue (entire playlist).
+    """
+    addPlaylistToQueue(userId: ID!, playlistId: ID!): QueueOperationResult!
+
+    """
+    Skip to the next song in the queue.
+    """
+    skipToNext(userId: ID!): QueueOperationResult!
+
+    """
+    Go back to the previous song in the queue.
+    """
+    skipToPrevious(userId: ID!): QueueOperationResult!
+
+    """
+    Remove a song from the queue by position.
+    """
+    removeFromQueue(userId: ID!, position: Int!): QueueOperationResult!
+
+    """
+    Move a song within the queue.
+    """
+    moveInQueue(userId: ID!, fromPosition: Int!, toPosition: Int!): QueueOperationResult!
+
+    """
+    Shuffle the queue.
+    """
+    shuffleQueue(userId: ID!): QueueOperationResult!
+
+    """
+    Clear the queue.
+    """
+    clearQueue(userId: ID!): QueueOperationResult!
+
+    """
+    Set the repeat mode for the queue.
+    """
+    setRepeatMode(userId: ID!, mode: RepeatMode!): QueueOperationResult!
+}
