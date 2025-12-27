@@ -78,10 +78,18 @@ export type Mutation = {
   __typename?: 'Mutation';
   /** Health check */
   _health: Scalars['String']['output'];
+  /** Add multiple songs to the queue (entire playlist). */
+  addPlaylistToQueue: QueueOperationResult;
   /** Add a Song to the end of a playlist */
   addSongToPlaylist: Playlist;
   /** Add a Song to a specific position in a playlist */
   addSongToPlaylistAtPosition: Playlist;
+  /** Add a song to user's playback queue. */
+  addToQueue: QueueOperationResult;
+  /** Clear all undo/redo history for a playlist. */
+  clearPlaylistHistory: Scalars['Boolean']['output'];
+  /** Clear the queue. */
+  clearQueue: QueueOperationResult;
   /** Create a new playlist as a child of an existing playlist. */
   createChildPlaylist: Playlist;
   /** Create a Playlist */
@@ -101,19 +109,42 @@ export type Mutation = {
   deleteSong: Scalars['Boolean']['output'];
   /** Remove a connection between two songs. */
   deleteSongConnection: Scalars['Boolean']['output'];
+  /** Move a song within the queue. */
+  moveInQueue: QueueOperationResult;
+  /** Redo last undone action on playlist. Returns the action that was redone. */
+  redoPlaylistAction?: Maybe<PlaylistAction>;
   /**
    * Remove a playlist from the hierarchy (sets parentId to null).
    * Children will be re-parented to the removed playlist's parent.
    */
   removeFromHierarchy: Playlist;
+  /** Remove a song from the queue by position. */
+  removeFromQueue: QueueOperationResult;
   /** Remove a Song from a playlist */
   removeSongFromPlaylist: Playlist;
   /** Set/update a playlist's parent, creating a hierarchy relationship. */
   setPlaylistParent: Playlist;
+  /** Set the repeat mode for the queue. */
+  setRepeatMode: QueueOperationResult;
   /** Update User Preferences */
   setUserPreferences: User;
+  /** Shuffle the queue. */
+  shuffleQueue: QueueOperationResult;
+  /** Skip to the next song in the queue. */
+  skipToNext: QueueOperationResult;
+  /** Go back to the previous song in the queue. */
+  skipToPrevious: QueueOperationResult;
+  /** Undo last action on playlist. Returns the action that was undone. */
+  undoPlaylistAction?: Maybe<PlaylistAction>;
   /** Update a playlist's name or description */
   updatePlaylist: Playlist;
+};
+
+
+/** Base Mutation type */
+export type MutationAddPlaylistToQueueArgs = {
+  playlistId: Scalars['ID']['input'];
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -129,6 +160,25 @@ export type MutationAddSongToPlaylistAtPositionArgs = {
   playlistId: Scalars['ID']['input'];
   position: Scalars['Int']['input'];
   songId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationAddToQueueArgs = {
+  songId: Scalars['ID']['input'];
+  userId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationClearPlaylistHistoryArgs = {
+  playlistId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationClearQueueArgs = {
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -184,8 +234,29 @@ export type MutationDeleteSongConnectionArgs = {
 
 
 /** Base Mutation type */
+export type MutationMoveInQueueArgs = {
+  fromPosition: Scalars['Int']['input'];
+  toPosition: Scalars['Int']['input'];
+  userId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationRedoPlaylistActionArgs = {
+  playlistId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
 export type MutationRemoveFromHierarchyArgs = {
   playlistId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationRemoveFromQueueArgs = {
+  position: Scalars['Int']['input'];
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -203,9 +274,40 @@ export type MutationSetPlaylistParentArgs = {
 
 
 /** Base Mutation type */
+export type MutationSetRepeatModeArgs = {
+  mode: RepeatMode;
+  userId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
 export type MutationSetUserPreferencesArgs = {
   preferences: UpdateUserPreferencesInput;
   userId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationShuffleQueueArgs = {
+  userId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationSkipToNextArgs = {
+  userId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationSkipToPreviousArgs = {
+  userId: Scalars['ID']['input'];
+};
+
+
+/** Base Mutation type */
+export type MutationUndoPlaylistActionArgs = {
+  playlistId: Scalars['ID']['input'];
 };
 
 
@@ -239,6 +341,21 @@ export type PathStep = {
   stepNumber: Scalars['Int']['output'];
 };
 
+/** Current playback queue state. */
+export type PlaybackQueueState = {
+  __typename?: 'PlaybackQueueState';
+  /** Currently playing song */
+  currentSong?: Maybe<QueuedSong>;
+  /** Recently played songs (most recent first) */
+  history: Array<QueuedSong>;
+  /** Total songs in queue */
+  queueSize: Scalars['Int']['output'];
+  /** Current repeat mode */
+  repeatMode: RepeatMode;
+  /** Upcoming songs in order */
+  upcoming: Array<QueuedSong>;
+};
+
 /**
  * Playlist represents a collection of songs created by a user.
  * Supports hierarchical structure (parent/child) for binary tree operations.
@@ -257,6 +374,33 @@ export type Playlist = {
   /** User owns this Playlist */
   user: User;
 };
+
+/** Represents a playlist action in the undo/redo history. */
+export type PlaylistAction = {
+  __typename?: 'PlaylistAction';
+  actionType: PlaylistActionType;
+  /** Original position (for move/remove) */
+  fromPosition?: Maybe<Scalars['Int']['output']>;
+  /** New value (for rename/update) */
+  newValue?: Maybe<Scalars['String']['output']>;
+  playlistId: Scalars['ID']['output'];
+  /** Previous value (for rename/update) */
+  previousValue?: Maybe<Scalars['String']['output']>;
+  /** Song ID involved in action */
+  songId?: Maybe<Scalars['ID']['output']>;
+  timeStamp: Scalars['DateTime']['output'];
+  /** New position (for move/add) */
+  toPosition?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Types of playlist actions that can be undone/redone. */
+export enum PlaylistActionType {
+  AddSong = 'ADD_SONG',
+  MoveSong = 'MOVE_SONG',
+  RemoveSong = 'REMOVE_SONG',
+  RenamePlaylist = 'RENAME_PLAYLIST',
+  UpdateDescription = 'UPDATE_DESCRIPTION'
+}
 
 /** A node in the playlist hierarchy tree. */
 export type PlaylistHierarchyNode = {
@@ -301,6 +445,8 @@ export type Query = {
   __typename?: 'Query';
   /** Health check */
   _health: Scalars['String']['output'];
+  /** Get the current playback queue for a user. */
+  playbackQueue: PlaybackQueueState;
   /** Get Playlist by ID */
   playlist?: Maybe<Playlist>;
   /** Get the full path from a playlist to its root ancestor. */
@@ -310,6 +456,10 @@ export type Query = {
    * Returns all playlists in the hierarchy in the specified traversal order.
    */
   playlistHierarchy: PlaylistHierarchyResult;
+  /** Get undo history for a playlist. */
+  playlistUndoHistory: Array<PlaylistAction>;
+  /** Get undo/redo status for a playlist. */
+  playlistUndoStatus: UndoRedoStatus;
   /** Get all Playlists for a User */
   playlists: Array<Playlist>;
   /** Get all root playlists (playlists with no parent) for a user. */
@@ -338,6 +488,12 @@ export type Query = {
 
 
 /** Base Query type - extended by prisma models */
+export type QueryPlaybackQueueArgs = {
+  userId: Scalars['ID']['input'];
+};
+
+
+/** Base Query type - extended by prisma models */
 export type QueryPlaylistArgs = {
   id: Scalars['ID']['input'];
 };
@@ -353,6 +509,19 @@ export type QueryPlaylistAncestorsArgs = {
 export type QueryPlaylistHierarchyArgs = {
   order?: InputMaybe<TraversalOrder>;
   rootPlaylistId: Scalars['ID']['input'];
+};
+
+
+/** Base Query type - extended by prisma models */
+export type QueryPlaylistUndoHistoryArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  playlistId: Scalars['ID']['input'];
+};
+
+
+/** Base Query type - extended by prisma models */
+export type QueryPlaylistUndoStatusArgs = {
+  playlistId: Scalars['ID']['input'];
 };
 
 
@@ -412,6 +581,30 @@ export type QueryUserArgs = {
 export type QueryUserPreferencesArgs = {
   userId: Scalars['ID']['input'];
 };
+
+/** Result of queue operation. */
+export type QueueOperationResult = {
+  __typename?: 'QueueOperationResult';
+  message: Scalars['String']['output'];
+  queue: PlaybackQueueState;
+  success: Scalars['Boolean']['output'];
+};
+
+/** A song in the playback queue. */
+export type QueuedSong = {
+  __typename?: 'QueuedSong';
+  addedAt: Scalars['DateTime']['output'];
+  addedBy?: Maybe<User>;
+  position: Scalars['Int']['output'];
+  song: Song;
+};
+
+/** Repeat mode for playback. */
+export enum RepeatMode {
+  All = 'ALL',
+  None = 'NONE',
+  One = 'ONE'
+}
 
 export type SearchCriteriaInput = {
   album?: InputMaybe<Scalars['String']['input']>;
@@ -485,6 +678,16 @@ export enum TraversalOrder {
   /** Root -> Children -> Siblings (top-down) */
   PreOrder = 'PRE_ORDER'
 }
+
+/** Undo/redo status for a playlist. */
+export type UndoRedoStatus = {
+  __typename?: 'UndoRedoStatus';
+  canRedo: Scalars['Boolean']['output'];
+  canUndo: Scalars['Boolean']['output'];
+  lastAction?: Maybe<PlaylistAction>;
+  redoHistoryCount: Scalars['Int']['output'];
+  undoHistoryCount: Scalars['Int']['output'];
+};
 
 export type UpdatePlaylistInput = {
   description?: InputMaybe<Scalars['String']['input']>;
@@ -598,11 +801,17 @@ export type ResolversTypes = {
   Mutation: ResolverTypeWrapper<Record<PropertyKey, never>>;
   PathConstraints: PathConstraints;
   PathStep: ResolverTypeWrapper<Omit<PathStep, 'song'> & { song: ResolversTypes['Song'] }>;
+  PlaybackQueueState: ResolverTypeWrapper<Omit<PlaybackQueueState, 'currentSong' | 'history' | 'upcoming'> & { currentSong?: Maybe<ResolversTypes['QueuedSong']>, history: Array<ResolversTypes['QueuedSong']>, upcoming: Array<ResolversTypes['QueuedSong']> }>;
   Playlist: ResolverTypeWrapper<PlaylistModel>;
+  PlaylistAction: ResolverTypeWrapper<PlaylistAction>;
+  PlaylistActionType: PlaylistActionType;
   PlaylistHierarchyNode: ResolverTypeWrapper<Omit<PlaylistHierarchyNode, 'playlist'> & { playlist: ResolversTypes['Playlist'] }>;
   PlaylistHierarchyResult: ResolverTypeWrapper<Omit<PlaylistHierarchyResult, 'nodes' | 'root'> & { nodes: Array<ResolversTypes['PlaylistHierarchyNode']>, root: ResolversTypes['Playlist'] }>;
   PlaylistSong: ResolverTypeWrapper<PlaylistSongModel>;
   Query: ResolverTypeWrapper<Record<PropertyKey, never>>;
+  QueueOperationResult: ResolverTypeWrapper<Omit<QueueOperationResult, 'queue'> & { queue: ResolversTypes['PlaybackQueueState'] }>;
+  QueuedSong: ResolverTypeWrapper<Omit<QueuedSong, 'addedBy' | 'song'> & { addedBy?: Maybe<ResolversTypes['User']>, song: ResolversTypes['Song'] }>;
+  RepeatMode: RepeatMode;
   SearchCriteriaInput: SearchCriteriaInput;
   SetPlaylistParentInput: SetPlaylistParentInput;
   ShortestPathResult: ResolverTypeWrapper<Omit<ShortestPathResult, 'endSong' | 'path' | 'startSong'> & { endSong?: Maybe<ResolversTypes['Song']>, path: Array<ResolversTypes['PathStep']>, startSong?: Maybe<ResolversTypes['Song']> }>;
@@ -610,6 +819,7 @@ export type ResolversTypes = {
   SongConnection: ResolverTypeWrapper<Omit<SongConnection, 'sourceSong' | 'targetSong'> & { sourceSong: ResolversTypes['Song'], targetSong: ResolversTypes['Song'] }>;
   String: ResolverTypeWrapper<Scalars['String']['output']>;
   TraversalOrder: TraversalOrder;
+  UndoRedoStatus: ResolverTypeWrapper<UndoRedoStatus>;
   UpdatePlaylistInput: UpdatePlaylistInput;
   UpdateUserPreferencesInput: UpdateUserPreferencesInput;
   User: ResolverTypeWrapper<UserModel>;
@@ -633,17 +843,22 @@ export type ResolversParentTypes = {
   Mutation: Record<PropertyKey, never>;
   PathConstraints: PathConstraints;
   PathStep: Omit<PathStep, 'song'> & { song: ResolversParentTypes['Song'] };
+  PlaybackQueueState: Omit<PlaybackQueueState, 'currentSong' | 'history' | 'upcoming'> & { currentSong?: Maybe<ResolversParentTypes['QueuedSong']>, history: Array<ResolversParentTypes['QueuedSong']>, upcoming: Array<ResolversParentTypes['QueuedSong']> };
   Playlist: PlaylistModel;
+  PlaylistAction: PlaylistAction;
   PlaylistHierarchyNode: Omit<PlaylistHierarchyNode, 'playlist'> & { playlist: ResolversParentTypes['Playlist'] };
   PlaylistHierarchyResult: Omit<PlaylistHierarchyResult, 'nodes' | 'root'> & { nodes: Array<ResolversParentTypes['PlaylistHierarchyNode']>, root: ResolversParentTypes['Playlist'] };
   PlaylistSong: PlaylistSongModel;
   Query: Record<PropertyKey, never>;
+  QueueOperationResult: Omit<QueueOperationResult, 'queue'> & { queue: ResolversParentTypes['PlaybackQueueState'] };
+  QueuedSong: Omit<QueuedSong, 'addedBy' | 'song'> & { addedBy?: Maybe<ResolversParentTypes['User']>, song: ResolversParentTypes['Song'] };
   SearchCriteriaInput: SearchCriteriaInput;
   SetPlaylistParentInput: SetPlaylistParentInput;
   ShortestPathResult: Omit<ShortestPathResult, 'endSong' | 'path' | 'startSong'> & { endSong?: Maybe<ResolversParentTypes['Song']>, path: Array<ResolversParentTypes['PathStep']>, startSong?: Maybe<ResolversParentTypes['Song']> };
   Song: SongModel;
   SongConnection: Omit<SongConnection, 'sourceSong' | 'targetSong'> & { sourceSong: ResolversParentTypes['Song'], targetSong: ResolversParentTypes['Song'] };
   String: Scalars['String']['output'];
+  UndoRedoStatus: UndoRedoStatus;
   UpdatePlaylistInput: UpdatePlaylistInput;
   UpdateUserPreferencesInput: UpdateUserPreferencesInput;
   User: UserModel;
@@ -680,8 +895,12 @@ export interface JsonScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes
 
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
   _health?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  addPlaylistToQueue?: Resolver<ResolversTypes['QueueOperationResult'], ParentType, ContextType, RequireFields<MutationAddPlaylistToQueueArgs, 'playlistId' | 'userId'>>;
   addSongToPlaylist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationAddSongToPlaylistArgs, 'playlistId' | 'songId'>>;
   addSongToPlaylistAtPosition?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationAddSongToPlaylistAtPositionArgs, 'playlistId' | 'position' | 'songId'>>;
+  addToQueue?: Resolver<ResolversTypes['QueueOperationResult'], ParentType, ContextType, RequireFields<MutationAddToQueueArgs, 'songId' | 'userId'>>;
+  clearPlaylistHistory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationClearPlaylistHistoryArgs, 'playlistId'>>;
+  clearQueue?: Resolver<ResolversTypes['QueueOperationResult'], ParentType, ContextType, RequireFields<MutationClearQueueArgs, 'userId'>>;
   createChildPlaylist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationCreateChildPlaylistArgs, 'name' | 'parentId'>>;
   createPlaylist?: Resolver<ResolversTypes['CreatePlaylistResponse'], ParentType, ContextType, RequireFields<MutationCreatePlaylistArgs, 'input'>>;
   createSong?: Resolver<ResolversTypes['CreateSongResponse'], ParentType, ContextType, RequireFields<MutationCreateSongArgs, 'input'>>;
@@ -690,10 +909,18 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deletePlaylist?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeletePlaylistArgs, 'id'>>;
   deleteSong?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteSongArgs, 'id'>>;
   deleteSongConnection?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteSongConnectionArgs, 'sourceSongId' | 'targetSongId'>>;
+  moveInQueue?: Resolver<ResolversTypes['QueueOperationResult'], ParentType, ContextType, RequireFields<MutationMoveInQueueArgs, 'fromPosition' | 'toPosition' | 'userId'>>;
+  redoPlaylistAction?: Resolver<Maybe<ResolversTypes['PlaylistAction']>, ParentType, ContextType, RequireFields<MutationRedoPlaylistActionArgs, 'playlistId'>>;
   removeFromHierarchy?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationRemoveFromHierarchyArgs, 'playlistId'>>;
+  removeFromQueue?: Resolver<ResolversTypes['QueueOperationResult'], ParentType, ContextType, RequireFields<MutationRemoveFromQueueArgs, 'position' | 'userId'>>;
   removeSongFromPlaylist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationRemoveSongFromPlaylistArgs, 'playlistId' | 'songId'>>;
   setPlaylistParent?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationSetPlaylistParentArgs, 'input'>>;
+  setRepeatMode?: Resolver<ResolversTypes['QueueOperationResult'], ParentType, ContextType, RequireFields<MutationSetRepeatModeArgs, 'mode' | 'userId'>>;
   setUserPreferences?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationSetUserPreferencesArgs, 'preferences' | 'userId'>>;
+  shuffleQueue?: Resolver<ResolversTypes['QueueOperationResult'], ParentType, ContextType, RequireFields<MutationShuffleQueueArgs, 'userId'>>;
+  skipToNext?: Resolver<ResolversTypes['QueueOperationResult'], ParentType, ContextType, RequireFields<MutationSkipToNextArgs, 'userId'>>;
+  skipToPrevious?: Resolver<ResolversTypes['QueueOperationResult'], ParentType, ContextType, RequireFields<MutationSkipToPreviousArgs, 'userId'>>;
+  undoPlaylistAction?: Resolver<Maybe<ResolversTypes['PlaylistAction']>, ParentType, ContextType, RequireFields<MutationUndoPlaylistActionArgs, 'playlistId'>>;
   updatePlaylist?: Resolver<ResolversTypes['Playlist'], ParentType, ContextType, RequireFields<MutationUpdatePlaylistArgs, 'id' | 'input'>>;
 };
 
@@ -701,6 +928,14 @@ export type PathStepResolvers<ContextType = GraphQLContext, ParentType extends R
   cumulativeWeight?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   song?: Resolver<ResolversTypes['Song'], ParentType, ContextType>;
   stepNumber?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+};
+
+export type PlaybackQueueStateResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PlaybackQueueState'] = ResolversParentTypes['PlaybackQueueState']> = {
+  currentSong?: Resolver<Maybe<ResolversTypes['QueuedSong']>, ParentType, ContextType>;
+  history?: Resolver<Array<ResolversTypes['QueuedSong']>, ParentType, ContextType>;
+  queueSize?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  repeatMode?: Resolver<ResolversTypes['RepeatMode'], ParentType, ContextType>;
+  upcoming?: Resolver<Array<ResolversTypes['QueuedSong']>, ParentType, ContextType>;
 };
 
 export type PlaylistResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Playlist'] = ResolversParentTypes['Playlist']> = {
@@ -713,6 +948,17 @@ export type PlaylistResolvers<ContextType = GraphQLContext, ParentType extends R
   song?: Resolver<Array<ResolversTypes['PlaylistSong']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   user?: Resolver<ResolversTypes['User'], ParentType, ContextType>;
+};
+
+export type PlaylistActionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PlaylistAction'] = ResolversParentTypes['PlaylistAction']> = {
+  actionType?: Resolver<ResolversTypes['PlaylistActionType'], ParentType, ContextType>;
+  fromPosition?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  newValue?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  playlistId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  previousValue?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  songId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  timeStamp?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  toPosition?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
 };
 
 export type PlaylistHierarchyNodeResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PlaylistHierarchyNode'] = ResolversParentTypes['PlaylistHierarchyNode']> = {
@@ -739,9 +985,12 @@ export type PlaylistSongResolvers<ContextType = GraphQLContext, ParentType exten
 
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
   _health?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  playbackQueue?: Resolver<ResolversTypes['PlaybackQueueState'], ParentType, ContextType, RequireFields<QueryPlaybackQueueArgs, 'userId'>>;
   playlist?: Resolver<Maybe<ResolversTypes['Playlist']>, ParentType, ContextType, RequireFields<QueryPlaylistArgs, 'id'>>;
   playlistAncestors?: Resolver<Array<ResolversTypes['Playlist']>, ParentType, ContextType, RequireFields<QueryPlaylistAncestorsArgs, 'playlistId'>>;
   playlistHierarchy?: Resolver<ResolversTypes['PlaylistHierarchyResult'], ParentType, ContextType, RequireFields<QueryPlaylistHierarchyArgs, 'order' | 'rootPlaylistId'>>;
+  playlistUndoHistory?: Resolver<Array<ResolversTypes['PlaylistAction']>, ParentType, ContextType, RequireFields<QueryPlaylistUndoHistoryArgs, 'limit' | 'playlistId'>>;
+  playlistUndoStatus?: Resolver<ResolversTypes['UndoRedoStatus'], ParentType, ContextType, RequireFields<QueryPlaylistUndoStatusArgs, 'playlistId'>>;
   playlists?: Resolver<Array<ResolversTypes['Playlist']>, ParentType, ContextType, RequireFields<QueryPlaylistsArgs, 'userId'>>;
   rootPlaylists?: Resolver<Array<ResolversTypes['Playlist']>, ParentType, ContextType, RequireFields<QueryRootPlaylistsArgs, 'userId'>>;
   searchSongs?: Resolver<Array<ResolversTypes['Song']>, ParentType, ContextType, RequireFields<QuerySearchSongsArgs, 'query'>>;
@@ -751,6 +1000,19 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   songs?: Resolver<Array<ResolversTypes['Song']>, ParentType, ContextType, Partial<QuerySongsArgs>>;
   user?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType, RequireFields<QueryUserArgs, 'id'>>;
   userPreferences?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType, RequireFields<QueryUserPreferencesArgs, 'userId'>>;
+};
+
+export type QueueOperationResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['QueueOperationResult'] = ResolversParentTypes['QueueOperationResult']> = {
+  message?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  queue?: Resolver<ResolversTypes['PlaybackQueueState'], ParentType, ContextType>;
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+};
+
+export type QueuedSongResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['QueuedSong'] = ResolversParentTypes['QueuedSong']> = {
+  addedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  addedBy?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
+  position?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  song?: Resolver<ResolversTypes['Song'], ParentType, ContextType>;
 };
 
 export type ShortestPathResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ShortestPathResult'] = ResolversParentTypes['ShortestPathResult']> = {
@@ -782,6 +1044,14 @@ export type SongConnectionResolvers<ContextType = GraphQLContext, ParentType ext
   weight?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
 };
 
+export type UndoRedoStatusResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['UndoRedoStatus'] = ResolversParentTypes['UndoRedoStatus']> = {
+  canRedo?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  canUndo?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  lastAction?: Resolver<Maybe<ResolversTypes['PlaylistAction']>, ParentType, ContextType>;
+  redoHistoryCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  undoHistoryCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+};
+
 export type UserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['User'] = ResolversParentTypes['User']> = {
   createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   email?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -800,14 +1070,19 @@ export type Resolvers<ContextType = GraphQLContext> = {
   JSON?: GraphQLScalarType;
   Mutation?: MutationResolvers<ContextType>;
   PathStep?: PathStepResolvers<ContextType>;
+  PlaybackQueueState?: PlaybackQueueStateResolvers<ContextType>;
   Playlist?: PlaylistResolvers<ContextType>;
+  PlaylistAction?: PlaylistActionResolvers<ContextType>;
   PlaylistHierarchyNode?: PlaylistHierarchyNodeResolvers<ContextType>;
   PlaylistHierarchyResult?: PlaylistHierarchyResultResolvers<ContextType>;
   PlaylistSong?: PlaylistSongResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
+  QueueOperationResult?: QueueOperationResultResolvers<ContextType>;
+  QueuedSong?: QueuedSongResolvers<ContextType>;
   ShortestPathResult?: ShortestPathResultResolvers<ContextType>;
   Song?: SongResolvers<ContextType>;
   SongConnection?: SongConnectionResolvers<ContextType>;
+  UndoRedoStatus?: UndoRedoStatusResolvers<ContextType>;
   User?: UserResolvers<ContextType>;
 };
 

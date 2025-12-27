@@ -4,6 +4,7 @@ import { songResolvers } from './song';
 import { playlistResolvers } from './playlist';
 import { dijkstraResolvers } from './dijkstra';
 import { binaryTreeResolvers } from './binary-tree';
+import { StackQueueResolvers } from './stack-queue';
 
 const resolvers = {
     DateTime: DateTimeResolver,
@@ -15,6 +16,7 @@ const resolvers = {
         ...playlistResolvers.Query,
         ...dijkstraResolvers.Query,
         ...binaryTreeResolvers.Query,
+        ...StackQueueResolvers.Query,
     },
     Mutation: {
         _health: () => 'OK',
@@ -23,6 +25,7 @@ const resolvers = {
         ...playlistResolvers.Mutation,
         ...dijkstraResolvers.Mutation,
         ...binaryTreeResolvers.Mutation,
+        ...StackQueueResolvers.Mutation,
     },
     // Type Resolvers (Field Resolvers)
     User: { ...userResolvers.User },

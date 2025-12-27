@@ -1,3 +1,5 @@
+import { fisherYatesShuffle } from '../utils/shuffle';
+
 // Queue = First In, First Out (FIFO)
 // Used for playback queue management
 // Enqueue=O(1), Dequeue=O(1), Peek=O(1)
@@ -89,12 +91,7 @@ export class Queue<T> {
 
     // Shuffle queue (Fisher-Yates algorithm)
     shuffle(): void {
-        const arr = this.toArray();
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        this.items = arr;
+        this.items = fisherYatesShuffle(this.toArray());
         this.head = 0;
     }
 

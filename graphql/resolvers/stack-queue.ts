@@ -1,6 +1,15 @@
-import { Resolvers } from '@/types/generated/graphql';
+import { Resolvers, RepeatMode } from '@/types/generated/graphql';
 import { GraphQLContext } from '@/graphql/context';
-import next from 'next';
+import { fisherYatesShuffle } from '@/lib/utils/shuffle';
+import {
+    mapActionToGraphQL,
+    reverseAction,
+    applyAction,
+    buildQueueOperationResult,
+    reorderQueue,
+    handleSkipToNext,
+    handleSkipToPrevious,
+} from '@/graphql/resolvers/helpers/sq-helper';
 
 export const StackQueueResolvers: Resolvers<GraphQLContext> = {
     Query: {
@@ -78,16 +87,16 @@ export const StackQueueResolvers: Resolvers<GraphQLContext> = {
                     song: qs.song,
                     position: idx,
                     addedAt: qs.addedAt,
-                    addedBy: qs.addedBy,
+                    addedBy: qs.addedBy ?? undefined,
                 })),
                 history: history.map((h, idx) => ({
                     song: h.song,
                     position: idx,
-                    playedAt: h.playedAt,
-                    addedBy: null,
+                    addedAt: h.playedAt,
+                    addedBy: undefined,
                 })),
                 queueSize: upcoming.length,
-                repeatMode: queueState.repeatMode as 'NONE' | 'ONE' | 'ALL',
+                repeatMode: RepeatMode[queueState.repeatMode as keyof typeof RepeatMode] ?? RepeatMode.None,
             };
         },
     },
@@ -173,6 +182,7 @@ export const StackQueueResolvers: Resolvers<GraphQLContext> = {
             });
 
             // Add all songs
+            let nextPosition = (lastSong?.position ?? -1) + 1;
             for (const ps of playlistSongs) {
                 await prisma.userQueueSong.create({
                     data: { userId, songId: ps.songId, position: nextPosition++ },
@@ -180,5 +190,97 @@ export const StackQueueResolvers: Resolvers<GraphQLContext> = {
             }
             return buildQueueOperationResult(prisma, userId, true, 'Playlist added to queue');
         },
-    }
-}
+
+        skipToNext: async (_parent, { userId }, { prisma }) => {
+            return await handleSkipToNext(prisma, userId);
+        },
+
+        skipToPrevious: async (_parent, { userId }, { prisma }) => {
+            return await handleSkipToPrevious(prisma, userId);
+        },
+
+        removeFromQueue: async (_parent, { userId, position }, { prisma }) => {
+            // Delete song at position
+            await prisma.userQueueSong.deleteMany({
+                where: { userId, position },
+            });
+
+            // Reorder subsequent songs
+            await reorderQueue(prisma, userId);
+
+            return buildQueueOperationResult(prisma, userId, true, 'Song removed from queue');
+        },
+
+        moveInQueue: async (_parent, { userId, fromPosition, toPosition }, { prisma }) => {
+            await prisma.$transaction(async (tx) => {
+                // Get the song to move
+                const songToMove = await tx.userQueueSong.findFirst({
+                    where: { userId, position: fromPosition },
+                });
+
+                if (!songToMove) throw new Error('Song not found in queue at the specified position');
+
+                // Temporarily set to -1
+                await tx.userQueueSong.update({
+                    where: { id: songToMove.id },
+                    data: { position: -1 },
+                });
+
+                // Shift songs between positions
+                if (fromPosition < toPosition) {
+                    await tx.userQueueSong.updateMany({
+                        where: { userId, position: { gt: fromPosition, lte: toPosition } },
+                        data: { position: { decrement: 1 } },
+                    });
+                } else {
+                    await tx.userQueueSong.updateMany({
+                        where: { userId, position: { gte: toPosition, lt: fromPosition } },
+                        data: { position: { increment: 1 } },
+                    });
+                }
+                // Move song to new position
+                await tx.userQueueSong.update({
+                    where: { id: songToMove.id },
+                    data: { position: toPosition },
+                });
+            });
+            return buildQueueOperationResult(prisma, userId, true, 'Song moved in queue');
+        },
+
+        shuffleQueue: async (_parent, { userId }, { prisma }) => {
+            const songs = await prisma.userQueueSong.findMany({
+                where: { userId },
+                orderBy: { position: 'asc' },
+            });
+
+            const shuffled = fisherYatesShuffle(songs);
+
+            // Update positions
+            await prisma.$transaction(
+                shuffled.map((song, idx) =>
+                    prisma.userQueueSong.update({
+                        where: { id: song.id },
+                        data: { position: idx },
+                    })
+                )
+            );
+            return buildQueueOperationResult(prisma, userId, true, 'Queue shuffled');
+        },
+
+        clearQueue: async (_parent, { userId }, { prisma }) => {
+            await prisma.userQueueSong.deleteMany({
+                where: { userId },
+            });
+            return buildQueueOperationResult(prisma, userId, true, 'Queue cleared');
+        },
+
+        setRepeatMode: async (_parent, { userId, mode }, { prisma }) => {
+            await prisma.userQueueState.upsert({
+                where: { userId },
+                update: { repeatMode: mode },
+                create: { userId, repeatMode: mode },
+            });
+            return buildQueueOperationResult(prisma, userId, true, 'Repeat mode updated');
+        },
+    },
+};
