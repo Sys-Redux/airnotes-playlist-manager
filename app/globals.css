@@ -1,26 +1,108 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Catppuccin Mocha - Base colors */
+    --color-ctp-base: #1e1e2e;
+    --color-ctp-mantle: #181825;
+    --color-ctp-crust: #11111b;
+
+    /* Catppuccin Mocha - Surface colors */
+    --color-ctp-surface0: #313244;
+    --color-ctp-surface1: #45475a;
+    --color-ctp-surface2: #585b70;
+
+    /* Catppuccin Mocha - Text colors */
+    --color-ctp-text: #cdd6f4;
+    --color-ctp-subtext1: #bac2de;
+    --color-ctp-subtext0: #a6adc8;
+    --color-ctp-overlay2: #9399b2;
+    --color-ctp-overlay1: #7f849c;
+    --color-ctp-overlay0: #6c7086;
+
+    /* Bright Blue Highlight (Sky/Sapphire) */
+    --color-ctp-blue: #89b4fa;
+    --color-ctp-sky: #89dceb;
+    --color-ctp-sapphire: #74c7ec;
+
+    /* Accent - Your bright light blue highlight */
+    --color-accent: #89dceb;
+    --color-accent-hover: #74c7ec;
+    --color-accent-muted: rgba(137, 220, 235, 0.2);
+
+    /* Other Catppuccin colors for variety */
+    --color-ctp-lavender: #b4befe;
+    --color-ctp-mauve: #cba6f7;
+    --color-ctp-pink: #f5c2e7;
+    --color-ctp-red: #f38ba8;
+    --color-ctp-peach: #fab387;
+    --color-ctp-yellow: #f9e2af;
+    --color-ctp-green: #a6e3a1;
+    --color-ctp-teal: #94e2d5;
+
+    /* Semantic color aliases */
+    --color-background: #1e1e2e;
+    --color-background-secondary: #181825;
+    --color-background-tertiary: #313244;
+    --color-foreground: #cdd6f4;
+    --color-foreground-muted: #a6adc8;
+    --color-border: #45475a;
+    --color-border-hover: #585b70;
   }
 }
 
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-ctp-mantle);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-ctp-surface2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ctp-overlay0);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+}
+
+/* Focus states with bright blue */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Links */
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-accent-hover);
 }
