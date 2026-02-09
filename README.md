@@ -2,7 +2,7 @@
 
 # 🎵 AirNotes
 
-A dynamic playlist management API that helps users organize, navigate, and explore their music collections. Built with a modern GraphQL-first approach, featuring data structures and algorithms for intelligent playlist operations.
+A dynamic playlist management API that helps users organize, navigate, and explore their music collections. Built with a modern GraphQL-first approach, featuring data structures and algorithms for intelligent playlist operations.Indie music focused.
 
 [![GitHub](https://img.shields.io/badge/GitHub-Sys--Redux-181717?style=for-the-badge&logo=github)](https://github.com/Sys-Redux)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-t--edge-0A66C2?style=for-the-badge&logo=linkedin)](https://www.linkedin.com/in/t-edge/)
